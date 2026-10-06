@@ -103,16 +103,13 @@ export function buildQuoteDocument({
     headerRows.push({ key: field.key, label: field.label, value: displayValue })
   }
 
-  // Trigger fields (e.g. "Sidewashers" Yes/No) that gate a multi_part_picker are never shown
-  // as their own row — Yes/No is just a gate, not a priced selection. Whether the answer is
-  // Yes or No, and whether the picker has any selections yet, the summary stays silent for
-  // this field; only the actual picked parts ever appear (added below when the picker field
-  // itself is processed).
+  // Yes/No gate fields (e.g. "Sidewashers", "CTA", "Avalanche") that reveal sub-options are never
+  // shown as their own row — "Yes" is just a gate, not a priced selection. Whether the answer is
+  // Yes or No, the summary stays silent for the gate; only the sub-options that are actually
+  // selected ever appear (added below when each sub-field is processed).
   const suppressedTriggerFields = new Set<string>()
   for (const rule of rules) {
-    if (rule.action_type !== 'show') continue
-    const targetItem = items.find((i) => i.metadata.field_key === rule.target_field)
-    if (targetItem?.metadata.widget !== 'multi_part_picker') continue
+    if (rule.action_type !== 'show' || rule.trigger_value !== 'yes') continue
     suppressedTriggerFields.add(rule.trigger_field)
   }
 

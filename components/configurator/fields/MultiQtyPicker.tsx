@@ -20,11 +20,14 @@ export default function MultiQtyPicker({
   options,
   value,
   onChange,
+  max,
 }: {
   label: string
   options: EquipmentOption[]
   value: SelectedPart[] | null
   onChange: (parts: SelectedPart[]) => void
+  // Optional per-option quantity ceiling (e.g. Shower Rinse Manifolds 1-5, Heated Dryers 1-2).
+  max?: number
 }) {
   // A field re-typed to multi_qty_picker can still have a leftover plain string/number in the
   // store from before the change (e.g. Hydraulic Units used to be a single-select radio) —
@@ -50,7 +53,8 @@ export default function MultiQtyPicker({
   }
 
   function setQuantity(partNumber: string, quantity: number) {
-    const clamped = Math.max(1, Math.round(quantity) || 1)
+    const floored = Math.max(1, Math.round(quantity) || 1)
+    const clamped = max === undefined ? floored : Math.min(max, floored)
     onChange(selected.map((p) => (p.part_number === partNumber ? { ...p, quantity: clamped } : p)))
   }
 
@@ -87,6 +91,7 @@ export default function MultiQtyPicker({
                 <input
                   type="number"
                   min={1}
+                  max={max}
                   value={picked.quantity ?? 1}
                   onChange={(e) => setQuantity(option.option_value, Number(e.target.value))}
                   onClick={(e) => e.stopPropagation()}

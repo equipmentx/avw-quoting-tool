@@ -85,6 +85,7 @@ const CatalogField = memo(function CatalogField({
         options={options}
         value={value as SelectedPart[] | null}
         onChange={(parts) => setField(field_key, parts)}
+        max={max}
       />
     )
   }
