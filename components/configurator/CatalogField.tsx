@@ -55,6 +55,10 @@ const CatalogField = memo(function CatalogField({
 
   if (!visible) return null
 
+  // Nothing to render — useApplyForcedValues already drives this field's value via its
+  // set_value rule, and it still shows up as its own row in the Quote Summary.
+  if (widget === 'hidden') return null
+
   if (widget === 'pending') {
     return (
       <div>

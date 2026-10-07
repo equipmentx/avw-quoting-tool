@@ -8,6 +8,10 @@ export type FieldWidget =
   | 'pending'
   | 'multi_part_picker'
   | 'multi_qty_picker'
+  // A field whose value is always set by a set_value rule (e.g. Avalanche's Yes -> J3179) and
+  // never shown to the user — there's nothing to pick, so a visible "Yes" radio or a long part
+  // description would just be clutter. Still a normal row in the Quote Summary.
+  | 'hidden'
 
 export interface EquipmentItemMetadata {
   field_key: string
