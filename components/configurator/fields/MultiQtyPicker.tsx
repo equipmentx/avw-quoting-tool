@@ -81,7 +81,10 @@ export default function MultiQtyPicker({
       {selected.length > 0 && <p className="mt-1 text-xs text-slate-500">{selected.length} selected</p>}
       {/* Each option is its own pill sized to its own text (inline-flex in a wrapping flex
           row), not a block-level row stretched to the field's full width — a 2-word option
-          like "1 Row 90" LG" shouldn't render as a wide empty bar. */}
+          like "1 Row 90" LG" shouldn't render as a wide empty bar. max-w-sm + break-words caps
+          it so a long option (Misc Blower Items has one 145 chars long) wraps onto a few lines
+          inside the pill instead of forcing one unbroken line wider than the viewport — that
+          was the actual cause of the page getting a horizontal scrollbar. */}
       <div className="mt-2 flex flex-wrap gap-2">
         {pickableOptions.map((option) => {
           const picked = selectedByNumber.get(option.option_value)
@@ -89,7 +92,7 @@ export default function MultiQtyPicker({
           return (
             <div
               key={option.id}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 transition ${
+              className={`inline-flex max-w-sm items-center gap-2 rounded-lg border px-3 py-2 transition ${
                 isSelected ? 'border-brand bg-mist' : 'border-slate-200'
               }`}
             >
@@ -98,7 +101,7 @@ export default function MultiQtyPicker({
                 onClick={() =>
                   isSelected ? remove(option.option_value) : setPending({ option, mode: 'add' })
                 }
-                className="flex items-center gap-2 text-left text-sm text-ink"
+                className="flex min-w-0 items-center gap-2 text-left text-sm text-ink"
               >
                 <span
                   className={`flex size-4 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold text-white ${
@@ -107,7 +110,7 @@ export default function MultiQtyPicker({
                 >
                   {isSelected && '✓'}
                 </span>
-                <span className="whitespace-nowrap">{option.option_label}</span>
+                <span className="min-w-0 break-words">{option.option_label}</span>
               </button>
               {isSelected && (
                 <button
