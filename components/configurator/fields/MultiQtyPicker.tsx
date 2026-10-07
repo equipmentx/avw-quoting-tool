@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { usePartsByNumbers } from '@/lib/catalog/usePartsByNumbers'
 import type { EquipmentOption } from '@/types/equipment'
 import type { SelectedPart } from '@/types/parts'
@@ -7,12 +8,16 @@ import type { SelectedPart } from '@/types/parts'
 /**
  * Multi-select with an independent, user-editable quantity per selected option — e.g. Hydraulic
  * Units (pick any combination of port sizes, each with its own quantity), Heated Dryers (Driver
- * / Passenger) or Shower Rinse Manifolds (1-5 rows). Simpler than MultiPartPicker on purpose: no
- * bundle rules, no color modals. `option_label` is the short text shown in the UI (e.g.
- * "Driver"); the real, full Items.xlsx description shown in the Quote Summary comes from the
- * `parts` table lookup below, falling back to `option_label` for any option not in that table
- * yet. Stores its value as SelectedPart[] so it slots into the existing multi_part_picker Quote
- * Summary rendering and selectionsPartsTotal pricing with zero changes to either.
+ * / Passenger) or Shower Rinse Manifolds (1-5 rows). `option_label` is the short text shown in
+ * the UI (e.g. "Driver (Left)"); the real, full Items.xlsx description shown in the Quote
+ * Summary comes from the `parts` table lookup below, falling back to `option_label` for any
+ * option not in that table yet. Stores its value as SelectedPart[] so it slots into the existing
+ * multi_part_picker Quote Summary rendering and selectionsPartsTotal pricing with zero changes
+ * to either.
+ *
+ * Picking an option opens QuantityModal (same visual language as MultiPartPicker's choice
+ * modals) rather than an inline number input next to the checkbox — a bare input squeezed onto
+ * a row is easy to miss entirely and doesn't match how every other choice in this app is made.
  *
  * An option with option_value === 'none' renders as a separate "clear all" pill instead of a
  * normal checkbox row — clicking it empties the whole selection rather than being stored as a
@@ -43,26 +48,31 @@ export default function MultiQtyPicker({
   const { parts: realParts } = usePartsByNumbers(pickableOptions.map((o) => o.option_value))
   const realPartByNumber = new Map(realParts.map((p) => [p.part_number, p]))
 
-  function toggle(option: EquipmentOption) {
-    if (selectedByNumber.has(option.option_value)) {
-      onChange(selected.filter((p) => p.part_number !== option.option_value))
-      return
+  // Awaiting a quantity pick for one option — 'add' (not yet selected, Cancel leaves it
+  // unselected) or 'edit' (already selected, reopened to change its quantity).
+  const [pending, setPending] = useState<{ option: EquipmentOption; mode: 'add' | 'edit' } | null>(null)
+
+  function confirmQuantity(quantity: number) {
+    if (!pending) return
+    const { option, mode } = pending
+    if (mode === 'edit') {
+      onChange(selected.map((p) => (p.part_number === option.option_value ? { ...p, quantity } : p)))
+    } else {
+      const real = realPartByNumber.get(option.option_value)
+      const part: SelectedPart = {
+        part_number: option.option_value,
+        description: real?.description ?? option.option_label,
+        unit_price: real?.unit_price ?? option.price_modifier,
+        image_url: real?.image_url ?? null,
+        quantity,
+      }
+      onChange([...selected, part])
     }
-    const real = realPartByNumber.get(option.option_value)
-    const part: SelectedPart = {
-      part_number: option.option_value,
-      description: real?.description ?? option.option_label,
-      unit_price: real?.unit_price ?? option.price_modifier,
-      image_url: real?.image_url ?? null,
-      quantity: 1,
-    }
-    onChange([...selected, part])
+    setPending(null)
   }
 
-  function setQuantity(partNumber: string, quantity: number) {
-    const floored = Math.max(1, Math.round(quantity) || 1)
-    const clamped = max === undefined ? floored : Math.min(max, floored)
-    onChange(selected.map((p) => (p.part_number === partNumber ? { ...p, quantity: clamped } : p)))
+  function remove(partNumber: string) {
+    onChange(selected.filter((p) => p.part_number !== partNumber))
   }
 
   return (
@@ -76,14 +86,16 @@ export default function MultiQtyPicker({
           return (
             <div
               key={option.id}
-              className={`rounded-lg border px-3 py-2 transition ${
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition ${
                 isSelected ? 'border-brand bg-mist' : 'border-slate-200'
               }`}
             >
               <button
                 type="button"
-                onClick={() => toggle(option)}
-                className="flex w-full min-w-0 items-center gap-2 text-left text-sm text-ink"
+                onClick={() =>
+                  isSelected ? remove(option.option_value) : setPending({ option, mode: 'add' })
+                }
+                className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm text-ink"
               >
                 <span
                   className={`flex size-4 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold text-white ${
@@ -94,21 +106,14 @@ export default function MultiQtyPicker({
                 </span>
                 <span className="min-w-0 break-words">{option.option_label}</span>
               </button>
-              {/* Quantity is its own clearly-labeled row under the checkbox, not squeezed onto
-                  the same line as a possibly-long label — a bare number input off on the far
-                  right of a wide row is easy to miss entirely. */}
               {isSelected && (
-                <div className="mt-2 flex items-center gap-2 border-t border-brand/20 pt-2 pl-6">
-                  <label className="text-xs font-medium text-slate-500">Quantity{max ? ` (1–${max})` : ''}</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={max}
-                    value={picked.quantity ?? 1}
-                    onChange={(e) => setQuantity(option.option_value, Number(e.target.value))}
-                    className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPending({ option, mode: 'edit' })}
+                  className="shrink-0 rounded-full border border-brand/30 bg-white px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-mist"
+                >
+                  Qty: {picked.quantity ?? 1}
+                </button>
               )}
             </div>
           )
@@ -126,6 +131,89 @@ export default function MultiQtyPicker({
             {noneOption.option_label}
           </button>
         )}
+      </div>
+      {pending && (
+        <QuantityModal
+          heading={pending.option.option_label}
+          max={max}
+          current={selectedByNumber.get(pending.option.option_value)?.quantity ?? 1}
+          onChoose={confirmQuantity}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Same visual language as MultiPartPicker's choice modals (SubgroupChoiceModal/
+// BundleChoiceModal) — a centered card with one row of buttons — so every "pick one of a few
+// things" prompt in the configurator looks like it belongs to the same app.
+function QuantityModal({
+  heading,
+  max,
+  current,
+  onChoose,
+  onCancel,
+}: {
+  heading: string
+  // Defined (small — 2, 5) -> a button per number, same look as MultiPartPicker's choice
+  // modals. Undefined (Hydraulic Units, Misc Blower Items never had a ceiling) -> a plain
+  // number input instead of guessing an arbitrary button-grid cap.
+  max?: number
+  current: number
+  onChoose: (quantity: number) => void
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = useState(String(current))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xs rounded-xl bg-white p-5 shadow-xl">
+        <p className="text-sm font-semibold text-ink">{heading}</p>
+        <p className="mt-1 text-xs text-slate-500">How many?</p>
+        {max !== undefined ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onChoose(n)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-center text-sm font-medium transition ${
+                  n === current
+                    ? 'border-brand bg-mist text-ink'
+                    : 'border-slate-200 text-ink hover:border-brand hover:bg-mist'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30"
+            />
+            <button
+              type="button"
+              onClick={() => onChoose(Math.max(1, Math.round(Number(draft)) || 1))}
+              className="flex-1 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-ink"
+            >
+              Confirm
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-mist"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   )

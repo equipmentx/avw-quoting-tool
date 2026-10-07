@@ -227,7 +227,13 @@ export default function ConfiguratorShell({
       <TopBar saving={saving} onNewQuote={handleNewQuote} />
       <TabNav order={tabOrder} />
       <div className="flex">
-        <div className="flex-1 p-6">{renderTab()}</div>
+        {/* max-w caps every field's width to a readable measure — without it, collapsing
+            SummaryPanel hands this column the freed-up width and EVERY field (radio groups,
+            pickers, everything) stretches edge-to-edge instead of staying a fixed, comfortable
+            size. mx-auto centers it rather than pinning it to one side when there's extra room. */}
+        <div className="flex-1 p-6">
+          <div className="mx-auto max-w-2xl">{renderTab()}</div>
+        </div>
         <SummaryPanel />
       </div>
       <FooterNav
